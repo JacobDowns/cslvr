@@ -2,7 +2,7 @@ from cslvr   import *
 from fenics  import *
 from pylab   import *
 
-out_dir  = 'dump/vars_jakobshavn_small/'
+out_dir  = 'dump/vars_jakobshavn_small_quadratic_energy/'
 
 # collect the raw data :
 searise  = DataFactory.get_searise()

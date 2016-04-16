@@ -853,11 +853,11 @@ class D3Model(Model):
     self.D = Depth(element=self.Q.ufl_element())
     
     # Enthalpy model
-    self.theta_surface = Function(self.Q, name='theta_surface')
-    self.theta_float   = Function(self.Q, name='theta_float')
-    self.theta_app     = Function(self.Q, name='theta_app')
-    self.theta0        = Function(self.Q, name='theta0')
-    self.W0            = Function(self.Q, name='W0')
+    self.theta_surface = Function(self.Qp, name='theta_surface')
+    self.theta_float   = Function(self.Qp, name='theta_float')
+    self.theta_app     = Function(self.Qp, name='theta_app')
+    self.theta0        = Function(self.Qp, name='theta0')
+    self.W0            = Function(self.Qp, name='W0')
     self.thetahat      = Function(self.Q, name='thetahat')
     self.uhat          = Function(self.Q, name='uhat')
     self.vhat          = Function(self.Q, name='vhat')

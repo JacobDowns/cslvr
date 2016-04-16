@@ -5,8 +5,8 @@ from dolfin_adjoint   import *
 import sys
 
 # set the relavent directories :
-var_dir = 'dump/vars_jakobshavn_small/'  # directory from gen_vars.py
-out_dir = 'dump/jakob_small/inversion_Wc_0.01/'
+var_dir = 'dump/vars_jakobshavn_small_quadratic_energy/'
+out_dir = 'dump/jakob_small/inversion_Wc_0.01_quadratic_energy/'
 
 # create HDF5 files for saving and loading data :
 fmeshes = HDF5File(mpi_comm_world(), var_dir + 'submeshes.h5', 'r')
@@ -35,7 +35,7 @@ d3model.init_E(1.0)
 d3model.init_W(0.0)
 d3model.init_Wc(0.01)
 d3model.init_T(d3model.T_surface)
-d3model.init_k_0(1e-3)
+d3model.init_k_0(1e-1)
 d3model.solve_hydrostatic_pressure()
 d3model.form_energy_dependent_rate_factor()
 
@@ -70,17 +70,39 @@ d3model.init_Ubar(Ubar_e)
 d3model.init_beta_SIA()
 
 mom    = MomentumDukowiczBP(d3model, linear=False)
+#momTMC = MomentumDukowiczStokesReduced(d3model, linear=False)
 momTMC = MomentumDukowiczBrinkerhoffStokes(d3model, linear=False)
-nrg    = Enthalpy(d3model, momTMC, transient=False, use_lat_bc=True)
+nrg    = Enthalpy(d3model, momTMC, energy_flux_mode='Fb',
+                  transient=False, use_lat_bc=True)
 
-frstrt = HDF5File(mpi_comm_world(), out_dir + '10/tmc.h5', 'r')
-d3model.init_T(frstrt)
-d3model.init_W(frstrt)
-d3model.init_Fb(frstrt)
-d3model.init_alpha(frstrt)
-d3model.init_U(frstrt)
-d3model.init_p(frstrt)
-d3model.init_theta(frstrt)
+# solve velocity :
+mom.solve(annotate=False)
+
+# update pressure-melting point :
+nrg.calc_T_melt(annotate=False)
+
+# calculate basal friction heat flux :
+mom.calc_q_fric()
+
+# solve energy steady-state equations to derive temperate zone :
+nrg.derive_temperate_zone(annotate=False)
+
+# fixed-point interation for thermal parameters and discontinuous 
+# properties :
+nrg.update_thermal_parameters(annotate=False)
+
+d3model.save_xdmf(d3model.theta, 'theta')
+d3model.save_xdmf(d3model.W,     'W')
+sys.exit(0)
+
+#frstrt = HDF5File(mpi_comm_world(), out_dir + '10/tmc.h5', 'r')
+#d3model.init_T(frstrt)
+#d3model.init_W(frstrt)
+#d3model.init_Fb(frstrt)
+#d3model.init_alpha(frstrt)
+#d3model.init_U(frstrt)
+#d3model.init_p(frstrt)
+#d3model.init_theta(frstrt)
 
 # thermo-solve callback function :
 def tmc_cb_ftn():
@@ -132,7 +154,7 @@ wop_kwargs = {'max_iter'            : 350,
               'method'              : 'ipopt',
               'adj_callback'        : None}
                                     
-tmc_kwargs = {'momentum'            : momTMC,
+tmc_kwargs = {'momentum'            : mom,#TMC,
               'energy'              : nrg,
               'wop_kwargs'          : wop_kwargs,
               'callback'            : tmc_cb_ftn,
@@ -153,23 +175,22 @@ uop_kwargs = {'control'             : d3model.beta,
                                     
 ass_kwargs = {'momentum'            : mom,
               'beta_i'              : d3model.beta.copy(True),
-              'max_iter'            : 11,
+              'max_iter'            : 1,
               'tmc_kwargs'          : tmc_kwargs,
               'uop_kwargs'          : uop_kwargs,
               'atol'                : 1.0,
               'rtol'                : 1e-4,
-              'initialize'          : False,
+              'initialize'          : True,
               'incomplete'          : True,
               'post_iter_save_vars' : None,#tmc_save_vars,
               'post_ini_callback'   : None,
-              'starting_i'          : 11}
+              'starting_i'          : 1}
 
-# assimilate ! :
-d3model.assimilate_U_ob(**ass_kwargs) 
+## assimilate ! :
+#d3model.assimilate_U_ob(**ass_kwargs) 
                                     
-## or restart and thermo_solve :
-#d3model.set_out_dir(out_dir + '03/')
-#d3model.thermo_solve(**tmc_kwargs)
+# or restart and thermo_solve :
+d3model.thermo_solve(**tmc_kwargs)
 
  
 

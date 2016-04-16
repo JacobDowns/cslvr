@@ -1499,7 +1499,8 @@ class Model(object):
     E_gnd       = self.E_gnd
     a_T         = conditional( lt(Tp, 263.15),  self.a_T_l, self.a_T_u)
     Q_T         = conditional( lt(Tp, 263.15),  self.Q_T_l, self.Q_T_u)
-    W_T         = conditional( lt(W,  0.01),    W,          0.01)
+    #W_T         = conditional( le(W,  0.01),    W,          0.01)
+    W_T         = self.W_T
     self.A_shf  = E_shf*a_T*(1 + 181.25*W_T)*exp(-Q_T/(R*Tp))
     self.A_gnd  = E_gnd*a_T*(1 + 181.25*W_T)*exp(-Q_T/(R*Tp))
  
@@ -1894,27 +1895,28 @@ class Model(object):
     self.lam           = Function(self.Q, name='lam')
     
     # energy model :
-    self.T             = Function(self.Q, name='T')
-    self.Tp            = Function(self.Q, name='Tp')
-    self.q_geo         = Function(self.Q, name='q_geo')
+    self.T             = Function(self.Qp, name='T')
+    self.Tp            = Function(self.Qp, name='Tp')
+    self.q_geo         = Function(self.Qp, name='q_geo')
     self.q_fric        = Function(self.Q, name='q_fric')
-    self.gradT_B       = Function(self.Q, name='gradT_B')
-    self.gradTm_B      = Function(self.Q, name='gradTm_B')
-    self.theta         = Function(self.Q, name='theta')
-    self.W             = Function(self.Q, name='W')
-    self.Wc            = Function(self.Q, name='Wc')
-    self.Mb            = Function(self.Q, name='Mb')
-    self.rhob          = Function(self.Q, name='rhob')
-    self.T_melt        = Function(self.Q, name='T_melt')     # pressure-melting
-    self.theta_melt    = Function(self.Q, name='theta_melt') # pressure-melting
-    self.T_surface     = Function(self.Q, name='T_surface')
-    self.alpha         = Function(self.Q, name='alpha')
-    self.Fb            = Function(self.Q, name='Fb')
-    self.PE            = Function(self.Q, name='PE')
-    self.W_int         = Function(self.Q, name='W_int')
-    self.Fb_min        = Function(self.Q, name='Fb_min')
-    self.Fb_max        = Function(self.Q, name='Fb_max')
-    self.Q_int         = Function(self.Q, name='Q_int')
+    self.gradT_B       = Function(self.Qp, name='gradT_B')
+    self.gradTm_B      = Function(self.Qp, name='gradTm_B')
+    self.theta         = Function(self.Qp, name='theta')
+    self.W             = Function(self.Qp, name='W')
+    self.Wc            = Function(self.Qp, name='Wc')
+    self.Mb            = Function(self.Qp, name='Mb')
+    self.rhob          = Function(self.Qp, name='rhob')
+    self.T_melt        = Function(self.Qp, name='T_melt')     # pressure-melting
+    self.theta_melt    = Function(self.Qp, name='theta_melt') # pressure-melting
+    self.T_surface     = Function(self.Qp, name='T_surface')
+    self.alpha         = Function(self.Qp, name='alpha')
+    self.Fb            = Function(self.Qp, name='Fb')
+    self.PE            = Function(self.Qp, name='PE')
+    self.W_int         = Function(self.Qp, name='W_int')
+    self.Fb_min        = Function(self.Qp, name='Fb_min')
+    self.Fb_max        = Function(self.Qp, name='Fb_max')
+    self.Q_int         = Function(self.Qp, name='Q_int')
+    self.W_T           = Function(self.Qp, name='W_T')
     self.k_0           = Constant(1.0,    name='k_0')
     self.k_0.rename('k_0', 'k_0')
     

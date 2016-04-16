@@ -231,8 +231,8 @@ class Energy(Physics):
     model   = self.model
 
     # set up functions for surface (s) and current objective (o) :
-    theta_s = Function(model.Q)
-    theta_o = Function(model.Q)
+    theta_s = Function(model.Qp)
+    theta_o = Function(model.Qp)
 
     # calculate L_inf norm :
     theta_v   = model.theta.vector().array()
@@ -243,7 +243,7 @@ class Energy(Physics):
     theta_o.vector().apply('insert')
  
     # apply difference over only grounded surface :
-    bc_theta  = DirichletBC(model.Q, theta_o, model.ff, model.GAMMA_B_GND)
+    bc_theta  = DirichletBC(model.Qp, theta_o, model.ff, model.GAMMA_B_GND)
     bc_theta.apply(theta_s.vector())
 
     # calculate L_inf vector norm :
@@ -313,6 +313,9 @@ class Energy(Physics):
     W_v[W_v > 1.0]  = 1.0    # no hot water, please.
     model.assign_variable(model.W0,  model.W,  cls=self)
     model.init_W(W_v, cls=self)
+    
+    W_v[W_v > 0.01]  = 0.01
+    model.assign_variable(model.W_T,  W_v,  cls=self)
     
   def optimize_water_flux(self, max_iter, bounds, method='ipopt',
                           adj_callback=None):
@@ -439,7 +442,7 @@ class Energy(Physics):
     print_min_max(Fb_opt, 'Fb_opt')
 
     # extrude the flux up and make the optimal control variable available :
-    Fb_ext = model.vert_extrude(Fb_opt, d='up')
+    Fb_ext = model.vert_extrude(Fb_opt, d='up', Q=model.Qp)
     model.init_Fb(Fb_ext, cls=self)
     #Control(model.Fb).update(Fb_ext)  # FIXME: does this work?
 
@@ -544,7 +547,7 @@ class Enthalpy(Energy):
     
     r             = model.r
     mesh          = model.mesh
-    Q             = model.Q
+    Q             = model.Qp
     T             = model.T
     W             = model.W
     T_m           = model.T_melt
@@ -558,6 +561,7 @@ class Enthalpy(Energy):
     cw            = model.cw
     T_surface     = model.T_surface
     theta_surface = model.theta_surface
+    theta_melt    = model.theta_melt
     theta_float   = model.theta_float
     theta_app     = model.theta_app
     q_geo         = model.q_geo
@@ -587,19 +591,27 @@ class Enthalpy(Energy):
     # internal friction (strain heat) :
     Q_s_gnd = 4 * eta_gnd * epsdot
     Q_s_shf = 4 * eta_shf * epsdot
+    
+    # temperature and water content expressions :
+    #W_t   = (model.theta - theta_melt) / L
+    #T_c   = (-146.3 + sqrt(146.3**2 + 2*7.253*model.theta)) / 7.253
+    #W     = conditional( ge(model.theta, theta_melt), W_t, 0.0)
+    #T     = conditional( le(model.theta, theta_melt), T_c, T_m)
+    #alpha = conditional( gt(model.theta, theta_melt), 1.0, 0.0)
 
     # coefficient for non-advective water flux (enthalpy-gradient) :
-    k_c   = conditional( gt(W, 0.0), model.k_0, 1 )
+    #k_c   = conditional( gt(W, 0.0), model.k_0, 1 )
+    k_c   = conditional( gt(model.theta, theta_melt), model.k_0, 1.0 )
 
     # thermal conductivity and heat capacity (Greve and Blatter 2009) :
-    ki    = spy * 9.828 * exp(-0.0057*T)  # converted to J/(a*m*K)
+    ki    = 9.828 * exp(-0.0057*T)
     ci    = 146.3 + 7.253*T
     
     # bulk properties :
     k     =  (1 - W)*ki   + W*kw     # bulk thermal conductivity
     c     =  (1 - W)*ci   + W*cw     # bulk heat capacity
     rho   =  (1 - W)*rhoi + W*rhow   # bulk density
-    kappa =  k_c * k                 # discontinuous with water
+    kappa =  spy * k_c * k           # discontinuous with water
     Xi    =  kappa / (rho*c)         # bulk enthalpy-gradient diffusivity
 
     # frictional heating :
@@ -746,8 +758,8 @@ class Enthalpy(Energy):
       # calculate energy and temperature melting point :
       self.calc_T_melt(annotate=False)
 
-      T_v        = T.vector().array()
-      W_v        = W.vector().array()
+      T_v        = model.T.vector().array()
+      W_v        = model.W.vector().array()
       T_s_v      = T_surface.vector().array()
       T_m_v      = T_m.vector().array()
       Tp_v       = T_v.copy()
@@ -791,7 +803,7 @@ class Enthalpy(Energy):
     if avg:
       PE = model.calc_vert_average(PE)
     else:
-      PE = project(PE, annotate=False)
+      PE = project(PE, model.Q, annotate=False)
     model.init_PE(PE, cls=self)
 
   def calc_internal_water(self):
@@ -805,7 +817,7 @@ class Enthalpy(Energy):
     W       = model.W
 
     # internal water content unknown :
-    W_i    = Function(model.Q)
+    W_i    = Function(model.Qp)
 
     # calculate L_inf norm :
     W_v   = W.vector().array()
@@ -814,11 +826,11 @@ class Enthalpy(Energy):
  
     # eliminate any water content on the boundaries :
     for domain in model.ext_boundaries:
-      bc_i = DirichletBC(model.Q, 0.0, model.ff, domain)
+      bc_i = DirichletBC(model.Qp, 0.0, model.ff, domain)
       bc_i.apply(W_i.vector())
 
     # calculate downward vertical integral :
-    W_int = model.vert_integrate(W_i, d='down')
+    W_int = model.vert_integrate(W_i, d='down', Q=model.Qp)
     model.init_W_int(W_int, cls=self)
 
   def calc_integrated_strain_heat(self):
@@ -839,7 +851,7 @@ class Enthalpy(Energy):
     Q  = 4 * model.eta * epsdot
 
     # calculate downward vertical integral :
-    Q_int = model.vert_integrate(Q, d='down')
+    Q_int = model.vert_integrate(Q, d='down', Q=model.Qp)
     model.init_Q_int(Q_int, cls=self)
 
   def calc_T_melt(self, annotate=False):
@@ -855,8 +867,10 @@ class Enthalpy(Energy):
 
     gamma = model.gamma
     T_w   = model.T_w
-    p     = model.p
+    #p     = model.p
 
+    p     = Function(model.Qp)
+    p.interpolate(model.p)
     p_v   = p.vector().array()
     Tm    = T_w(0) - gamma(0)*p_v
     tht_m = 146.3*Tm + 7.253/2.0*Tm**2
@@ -926,8 +940,8 @@ class Enthalpy(Energy):
     k        = self.k
 
     # Mb is only valid on basal surface, needs extra matrix care :
-    phi  = TestFunction(model.Q)
-    du   = TrialFunction(model.Q)
+    phi  = TestFunction(model.Qp)
+    du   = TrialFunction(model.Qp)
     a_n  = du * phi * dBed_g
     L_n  = k * dot((grad(T)), N) * phi * dBed_g
    
@@ -953,8 +967,8 @@ class Enthalpy(Energy):
     k        = self.k
 
     # Mb is only valid on basal surface, needs extra matrix care :
-    phi  = TestFunction(model.Q)
-    du   = TrialFunction(model.Q)
+    phi  = TestFunction(model.Qp)
+    du   = TrialFunction(model.Qp)
     a_n  = du * phi * dBed_g
     L_n  = k * dot((grad(Tm)), N) * phi * dBed_g
    
@@ -985,8 +999,8 @@ class Enthalpy(Energy):
     u,v,w    = model.U3.split(True)
 
     # Mb is only valid on basal surface, needs extra matrix care :
-    phi  = TestFunction(model.Q)
-    du   = TrialFunction(model.Q)
+    phi  = TestFunction(model.Qp)
+    du   = TrialFunction(model.Qp)
     a_n  = du * phi * dBed_g
     L_n  = k * dot((grad(T)), N) * phi * dBed_g
    
@@ -994,11 +1008,14 @@ class Enthalpy(Energy):
     B_n  = assemble(L_n, annotate=False)
     A_n.ident_zeros()
    
-    grad_n  = Function(model.Q)
+    grad_n  = Function(model.Qp)
     solve(A_n, grad_n.vector(), B_n, 'cg', 'amg', annotate=False)
+
+    q_fric   = Function(model.Qp)
+    q_fric.interpolate(model.q_fric)
+    q_fric_v = q_fric.vector().array()
     
     W_v      = model.W.vector().array()
-    q_fric_v = model.q_fric.vector().array()
     q_geo_v  = model.q_geo.vector().array()
     grad_n_v = grad_n.vector().array()
 
@@ -1046,8 +1063,6 @@ class Enthalpy(Energy):
     
     # update the model variable :
     model.assign_variable(model.theta,self.theta,annotate=annotate,cls=self)
-    #model.theta.interpolate(self.theta, annotate=False)
-    #print_min_max(model.theta, 'theta', cls=self)
 
     # update the temperature and water content for other physics :
     self.partition_energy(annotate=False)

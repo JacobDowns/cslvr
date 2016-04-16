@@ -405,7 +405,7 @@ class MomentumDukowiczStokesReduced(Momentum):
     if (not model.use_periodic_boundaries and use_pressure_bc):
       s = "    - using water pressure lateral boundary condition -"
       print_text(s, self.color())
-      A -= Pb_w*dLat_t
+      A -= Pb*dLat_t
     
     # add lateral boundary conditions :
     # FIXME: need correct BP treatment here

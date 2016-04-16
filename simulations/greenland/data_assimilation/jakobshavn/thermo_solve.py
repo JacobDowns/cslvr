@@ -5,7 +5,7 @@ from dolfin_adjoint   import *
 import sys
 
 # set the relavent directories :
-var_dir  = 'dump/vars_jakobshavn_small/'
+var_dir  = 'dump/vars_jakobshavn_small_quadratic_energy/'
 out_dir  = 'dump/jakob_small/tmc_test/'
 
 # create HDF5 files for saving and loading data :
@@ -34,15 +34,15 @@ model.init_U_mask(fdata)
 model.init_time_step(1e-6)
 model.init_E(1.0)
 model.init_beta(fini)
-#model.init_T(model.T_surface)
+model.init_T(model.T_surface)
 #model.init_W(0.0)
-model.init_theta(fini)
-model.init_T(fini)
-model.init_W(fini)
+#model.init_theta(fini)
+#model.init_T(fini)
+#model.init_W(fini)
 model.init_U(fini)
 model.init_p(fini)
-model.init_alpha(fini)
-model.init_Fb(fini)
+#model.init_alpha(fini)
+#model.init_Fb(fini)
 model.init_k_0(1e-3)
 #model.solve_hydrostatic_pressure()
 model.form_energy_dependent_rate_factor()
@@ -56,16 +56,17 @@ model.form_energy_dependent_rate_factor()
 #model.init_p(frstrt)
 
 # initialize the physics :
-mom = MomentumDukowiczBrinkerhoffStokes(model)
+#mom = MomentumDukowiczBrinkerhoffStokes(model)
+mom = MomentumDukowiczStokesReduced(model)
 #mom = MomentumDukowiczBP(model)
 nrg = Enthalpy(model, mom, transient=False, use_lat_bc=True)
 
-mom.calc_q_fric()
-nrg.solve()
-fout    = HDF5File(mpi_comm_world(), out_dir + 'theta.h5',   'w')
-model.save_hdf5(model.theta, f=fout)
-model.save_xdmf(model.theta, 'theta')
-sys.exit(0)
+#mom.calc_q_fric()
+#nrg.solve()
+#fout    = HDF5File(mpi_comm_world(), out_dir + 'theta.h5',   'w')
+#model.save_hdf5(model.theta, f=fout)
+#model.save_xdmf(model.theta, 'theta')
+#sys.exit(0)
 
 
 # thermo-solve callback function :

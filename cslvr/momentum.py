@@ -250,7 +250,10 @@ class Momentum(Physics):
     u_v      = u.vector().array()
     v_v      = v.vector().array()
     w_v      = w.vector().array()
-    Fb_v     = model.Fb.vector().array()
+
+    Fb       = Function(model.Q)
+    Fb.interpolate(model.Fb)
+    Fb_v     = Fb.vector().array()
 
     q_fric_v = beta_v * (u_v**2 + v_v**2 + (w_v+Fb_v)**2)
     
